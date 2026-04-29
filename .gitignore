@@ -14,6 +14,8 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+train.log
+.trained_models_unpacked/
 *.egg-info/
 build/
 dist/
