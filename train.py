@@ -20,6 +20,7 @@ from torchvision.transforms.v2 import (
     Normalize,
     RandomHorizontalFlip,
     RandomRotation,
+    Resize,
 )
 
 from leaffliction.cli import console, die
@@ -42,14 +43,22 @@ def _build_loaders(directory: Path, split: float, batch: int, seed: int):
     sorted output, so the two instances iterate samples in identical order — making the
     integer indices from train_test_split consistent across both.
     """
+    # Resize first so any input size works (PDF data is 256x256 but evaluator
+    # may bring different sizes); then augment + normalize.
     train_tf = Compose(
         [
+            Resize((256, 256), antialias=True),
             RandomHorizontalFlip(p=0.5),
             RandomRotation(degrees=15),
             Normalize(mean=ImageNetMean, std=ImageNetStd),
         ]
     )
-    val_tf = Compose([Normalize(mean=ImageNetMean, std=ImageNetStd)])
+    val_tf = Compose(
+        [
+            Resize((256, 256), antialias=True),
+            Normalize(mean=ImageNetMean, std=ImageNetStd),
+        ]
+    )
 
     train_full = LeafDataset(directory, transform=train_tf)
     val_full = LeafDataset(directory, transform=val_tf)

@@ -22,6 +22,7 @@ def pie_and_bar(class_counts: dict[str, int], title: str, save: Path | None = No
     axes[0].set_title(f"{title} class distribution")
 
     axes[1].bar(classes, counts, color=colors)
+    axes[1].set_xticks(range(len(classes)))
     axes[1].set_xticklabels(classes, rotation=20, ha="right")
     axes[1].grid(axis="y", alpha=0.3)
 
