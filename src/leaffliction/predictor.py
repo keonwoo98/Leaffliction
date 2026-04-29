@@ -1,4 +1,5 @@
 """Inference: loads a zip artifact, classifies one image, renders a figure."""
+
 from __future__ import annotations
 
 import json

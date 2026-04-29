@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Part 3 — plantCV transformations and color histogram."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -84,18 +85,14 @@ def main(
         chosen = list(FLAG_TO_KEY.values())  # all by default
     dst.mkdir(parents=True, exist_ok=True)
     valid_suffixes = {".jpg", ".jpeg", ".png"}
-    images = [
-        p for p in src.iterdir() if p.is_file() and p.suffix.lower() in valid_suffixes
-    ]
+    images = [p for p in src.iterdir() if p.is_file() and p.suffix.lower() in valid_suffixes]
     for img_path in track(images, description="Transforming"):
         rgb = load_rgb(img_path)
         outs = all_transforms(rgb)
         for key in chosen:
             out_path = dst / f"{img_path.stem}_{key}{img_path.suffix}"
             Image.fromarray(outs[key]).save(out_path)
-    console.print(
-        f"[ok]Wrote {len(images) * len(chosen)} files into {dst}[/ok]"
-    )
+    console.print(f"[ok]Wrote {len(images) * len(chosen)} files into {dst}[/ok]")
 
 
 if __name__ == "__main__":

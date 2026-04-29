@@ -1,4 +1,5 @@
 """Smoke tests: each entrypoint runs `--help` without crashing."""
+
 from __future__ import annotations
 
 import subprocess

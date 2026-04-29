@@ -1,4 +1,5 @@
 """Tests for SHA1 signing and signature.txt round-trip."""
+
 from __future__ import annotations
 
 import hashlib

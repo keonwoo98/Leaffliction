@@ -1,4 +1,5 @@
 """Shared typer/rich helpers for the 5 entrypoints."""
+
 from __future__ import annotations
 
 import sys

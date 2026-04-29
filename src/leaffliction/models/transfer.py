@@ -1,4 +1,5 @@
 """EfficientNet-B0 transfer learning with two-stage fine-tuning support."""
+
 from __future__ import annotations
 
 import torch

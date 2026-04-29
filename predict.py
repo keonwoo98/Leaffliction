@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Part 4 — predict disease class for a single leaf image."""
+
 from __future__ import annotations
 
 from pathlib import Path

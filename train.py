@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Part 4 — train ScratchCNN and TransferModel; package artifacts + signature."""
+
 from __future__ import annotations
 
 import json
@@ -41,11 +42,13 @@ def _build_loaders(directory: Path, split: float, batch: int, seed: int):
     sorted output, so the two instances iterate samples in identical order — making the
     integer indices from train_test_split consistent across both.
     """
-    train_tf = Compose([
-        RandomHorizontalFlip(p=0.5),
-        RandomRotation(degrees=15),
-        Normalize(mean=ImageNetMean, std=ImageNetStd),
-    ])
+    train_tf = Compose(
+        [
+            RandomHorizontalFlip(p=0.5),
+            RandomRotation(degrees=15),
+            Normalize(mean=ImageNetMean, std=ImageNetStd),
+        ]
+    )
     val_tf = Compose([Normalize(mean=ImageNetMean, std=ImageNetStd)])
 
     train_full = LeafDataset(directory, transform=train_tf)
@@ -72,12 +75,18 @@ def _build_loaders(directory: Path, split: float, batch: int, seed: int):
     )
 
     train_loader = DataLoader(
-        train_ds, batch_size=batch, sampler=sampler,
-        num_workers=2, pin_memory=False,
+        train_ds,
+        batch_size=batch,
+        sampler=sampler,
+        num_workers=2,
+        pin_memory=False,
     )
     val_loader = DataLoader(
-        val_ds, batch_size=batch, shuffle=False,
-        num_workers=2, pin_memory=False,
+        val_ds,
+        batch_size=batch,
+        shuffle=False,
+        num_workers=2,
+        pin_memory=False,
     )
     return train_loader, val_loader, train_full.classes, train_full.class_to_idx
 
@@ -139,9 +148,7 @@ def main(
 
     set_seed(seed)
     console.print(f"[info]Loading dataset from {directory} ...[/info]")
-    train_loader, val_loader, classes, class_to_idx = _build_loaders(
-        directory, split, batch, seed
-    )
+    train_loader, val_loader, classes, class_to_idx = _build_loaders(directory, split, batch, seed)
     n_classes = len(classes)
     n_train = len(train_loader.dataset)  # type: ignore[arg-type]
     n_val = len(val_loader.dataset)  # type: ignore[arg-type]

@@ -1,4 +1,5 @@
 """Shared training loop with early stopping + LR plateau scheduler."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -85,9 +86,7 @@ def train(
         lr=config.lr,
         weight_decay=config.weight_decay,
     )
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.5, patience=2
-    )
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=2)
 
     result = TrainResult()
     epochs_no_improve = 0
@@ -106,9 +105,7 @@ def train(
                 weight_decay=config.weight_decay,
             )
 
-        train_loss, train_acc = _epoch(
-            model, train_loader, criterion, optimizer, device
-        )
+        train_loss, train_acc = _epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc = _epoch(model, val_loader, criterion, None, device)
 
         result.history["train_loss"].append(train_loss)
@@ -120,9 +117,7 @@ def train(
         if val_acc > result.best_val_acc + config.min_delta:
             result.best_val_acc = val_acc
             result.best_epoch = epoch
-            best_state = {
-                k: v.detach().cpu().clone() for k, v in model.state_dict().items()
-            }
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             epochs_no_improve = 0
         else:
             epochs_no_improve += 1

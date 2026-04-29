@@ -1,4 +1,5 @@
 """SHA1 signing & verification for dataset/model zip artifacts."""
+
 from __future__ import annotations
 
 import hashlib

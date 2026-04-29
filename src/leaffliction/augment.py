@@ -1,4 +1,5 @@
 """Six Albumentations-based augmentations (PDF Part 2)."""
+
 from __future__ import annotations
 
 import random
@@ -30,9 +31,7 @@ def apply_op(name: str, image: np.ndarray) -> np.ndarray:
     return transform(image=image)["image"]
 
 
-def apply_random_op(
-    image: np.ndarray, rng: random.Random | None = None
-) -> tuple[str, np.ndarray]:
+def apply_random_op(image: np.ndarray, rng: random.Random | None = None) -> tuple[str, np.ndarray]:
     rng = rng or random.Random()
     name = rng.choice(list(AUGMENTATION_OPS))
     return name, apply_op(name, image)
@@ -41,9 +40,7 @@ def apply_random_op(
 def save_with_suffix(original_path: Path, image: np.ndarray, suffix: str) -> Path:
     """Save augmented image as `<stem>_<Suffix>.JPG` next to the original."""
     original_path = Path(original_path)
-    out = original_path.with_name(
-        f"{original_path.stem}_{suffix}{original_path.suffix}"
-    )
+    out = original_path.with_name(f"{original_path.stem}_{suffix}{original_path.suffix}")
     Image.fromarray(image).save(out)
     return out
 

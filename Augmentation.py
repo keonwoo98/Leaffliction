@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Part 2 — augmentation: 6 ops on a single image, or balance a directory."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,9 +22,7 @@ app = typer.Typer(add_completion=False, help=__doc__)
 _TARGET = typer.Argument(
     ..., exists=True, help="Image file (single mode) or directory (batch mode)."
 )
-_BALANCE = typer.Option(
-    False, "--balance", help="Batch mode: balance classes via augmentation."
-)
+_BALANCE = typer.Option(False, "--balance", help="Batch mode: balance classes via augmentation.")
 _OUTPUT = typer.Option(
     Path("augmented_directory"), "--output", "-o", help="Batch mode output dir."
 )

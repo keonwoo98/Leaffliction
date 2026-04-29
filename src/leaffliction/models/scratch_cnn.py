@@ -1,4 +1,5 @@
 """Hand-designed CNN — every layer is the author's. Defense-friendly."""
+
 from __future__ import annotations
 
 import torch

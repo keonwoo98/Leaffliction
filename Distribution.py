@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Part 1 — display class distribution as pie + bar charts."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,8 +30,7 @@ def main(
     counts = {name: len(paths) for name, paths in classes.items()}
     title = directory.name or directory.resolve().name
     console.print(
-        f"[info]Found {len(counts)} classes, "
-        f"{sum(counts.values())} images in {directory}[/info]"
+        f"[info]Found {len(counts)} classes, {sum(counts.values())} images in {directory}[/info]"
     )
     pie_and_bar(counts, title=title, save=save)
 

@@ -1,4 +1,5 @@
 """Tests for the 6 augmentation ops + filename suffix convention."""
+
 from __future__ import annotations
 
 from pathlib import Path

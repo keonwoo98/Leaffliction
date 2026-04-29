@@ -1,4 +1,5 @@
 """Tests for LeafDataset & discover_classes."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -102,16 +103,12 @@ def test_transfer_forward_shape_and_freezing() -> None:
     assert y.shape == (2, 8)
     # By default the backbone is frozen
     backbone_grads = [
-        p.requires_grad
-        for n, p in model.named_parameters()
-        if "classifier" not in n
+        p.requires_grad for n, p in model.named_parameters() if "classifier" not in n
     ]
     assert not any(backbone_grads)
     # unfreeze() flips them back on
     model.unfreeze()
     backbone_grads = [
-        p.requires_grad
-        for n, p in model.named_parameters()
-        if "classifier" not in n
+        p.requires_grad for n, p in model.named_parameters() if "classifier" not in n
     ]
     assert all(backbone_grads)

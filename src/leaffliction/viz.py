@@ -1,4 +1,5 @@
 """Matplotlib chart helpers used across all 5 entrypoints."""
+
 from __future__ import annotations
 
 from pathlib import Path

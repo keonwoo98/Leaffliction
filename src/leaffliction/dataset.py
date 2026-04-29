@@ -1,4 +1,5 @@
 """Smart folder-walker that turns any leaf-image directory into class -> [paths]."""
+
 from __future__ import annotations
 
 from pathlib import Path
