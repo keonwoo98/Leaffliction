@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import time
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +12,6 @@ from pathlib import Path
 import numpy as np
 import torch
 import typer
-from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
@@ -83,19 +83,24 @@ def _build_loaders(directory: Path, split: float, batch: int, seed: int):
         replacement=True,
     )
 
+    # num_workers=8 + persistent_workers=True keeps the worker processes
+    # alive across epochs, which on macOS shaves a large amount of overhead
+    # (each fork() + module-import is expensive).
     train_loader = DataLoader(
         train_ds,
         batch_size=batch,
         sampler=sampler,
-        num_workers=2,
+        num_workers=8,
         pin_memory=False,
+        persistent_workers=True,
     )
     val_loader = DataLoader(
         val_ds,
         batch_size=batch,
         shuffle=False,
-        num_workers=2,
+        num_workers=8,
         pin_memory=False,
+        persistent_workers=True,
     )
     return train_loader, val_loader, train_full.classes, train_full.class_to_idx
 
@@ -107,24 +112,25 @@ def _train_one(
     val_loader: DataLoader,
     cfg: TrainConfig,
 ) -> dict:
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold]{task.description}"),
-        TimeElapsedColumn(),
-    ) as prog:
-        task_id = prog.add_task(f"Training {name}", total=None)
+    """Train one model, printing progress per epoch so the log file is readable."""
+    start = time.time()
+    console.print(f"[info]>>> Starting {name} ({cfg.epochs} epochs max)...[/info]")
 
-        def on_epoch_end(epoch: int, metrics: dict) -> None:
-            prog.update(
-                task_id,
-                description=(
-                    f"{name} epoch {epoch}: "
-                    f"train_acc={metrics['train_acc']:.3f} "
-                    f"val_acc={metrics['val_acc']:.3f}"
-                ),
-            )
+    def on_epoch_end(epoch: int, metrics: dict) -> None:
+        elapsed = time.time() - start
+        console.print(
+            f"  {name} epoch {epoch:3d}/{cfg.epochs} "
+            f"| train: loss={metrics['train_loss']:.4f} acc={metrics['train_acc']:.4f} "
+            f"| val: loss={metrics['val_loss']:.4f} acc={metrics['val_acc']:.4f} "
+            f"| t={elapsed:.0f}s"
+        )
 
-        result = train(model, train_loader, val_loader, cfg, on_epoch_end=on_epoch_end)
+    result = train(model, train_loader, val_loader, cfg, on_epoch_end=on_epoch_end)
+    total = time.time() - start
+    console.print(
+        f"[ok]<<< {name} done in {total:.0f}s. "
+        f"Best val_acc={result.best_val_acc:.4f} @ epoch {result.best_epoch}[/ok]"
+    )
     return {
         "history": result.history,
         "best_val_acc": result.best_val_acc,
