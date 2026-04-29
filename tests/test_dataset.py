@@ -78,3 +78,14 @@ def test_dataset_getitem_returns_tensor(tmp_dataset: Path) -> None:
 def test_dataset_len_matches_total_images(tmp_dataset: Path) -> None:
     ds = LeafDataset(tmp_dataset)
     assert len(ds) == 6  # 2 classes × 3 images
+
+
+def test_scratch_cnn_forward_shape() -> None:
+    import torch
+
+    from leaffliction.models.scratch_cnn import ScratchCNN
+
+    model = ScratchCNN(num_classes=8)
+    x = torch.randn(2, 3, 256, 256)
+    y = model(x)
+    assert y.shape == (2, 8)
