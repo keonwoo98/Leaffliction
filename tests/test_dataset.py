@@ -89,3 +89,29 @@ def test_scratch_cnn_forward_shape() -> None:
     x = torch.randn(2, 3, 256, 256)
     y = model(x)
     assert y.shape == (2, 8)
+
+
+def test_transfer_forward_shape_and_freezing() -> None:
+    import torch
+
+    from leaffliction.models.transfer import TransferModel
+
+    model = TransferModel(num_classes=8, pretrained=False)
+    x = torch.randn(2, 3, 256, 256)
+    y = model(x)
+    assert y.shape == (2, 8)
+    # By default the backbone is frozen
+    backbone_grads = [
+        p.requires_grad
+        for n, p in model.named_parameters()
+        if "classifier" not in n
+    ]
+    assert not any(backbone_grads)
+    # unfreeze() flips them back on
+    model.unfreeze()
+    backbone_grads = [
+        p.requires_grad
+        for n, p in model.named_parameters()
+        if "classifier" not in n
+    ]
+    assert all(backbone_grads)
