@@ -61,3 +61,20 @@ def test_leaf_dataset_builds_index(tmp_path: Path) -> None:
     assert len(ds) == 2
     assert ds.classes == ["Apple_healthy", "Apple_rust"]
     assert ds.class_to_idx == {"Apple_healthy": 0, "Apple_rust": 1}
+
+
+def test_dataset_getitem_returns_tensor(tmp_dataset: Path) -> None:
+    import torch
+
+    ds = LeafDataset(tmp_dataset)
+    img, label = ds[0]
+    assert isinstance(img, torch.Tensor)
+    assert img.shape == (3, 32, 32)
+    assert img.dtype == torch.float32
+    assert 0.0 <= img.min() <= img.max() <= 1.0
+    assert label in {0, 1}
+
+
+def test_dataset_len_matches_total_images(tmp_dataset: Path) -> None:
+    ds = LeafDataset(tmp_dataset)
+    assert len(ds) == 6  # 2 classes × 3 images

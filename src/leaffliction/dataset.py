@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import torch
+from PIL import Image
 from torch.utils.data import Dataset
+from torchvision.transforms.v2 import functional as F  # noqa: N812
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp"}
 
@@ -67,5 +70,10 @@ class LeafDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int):
-        # Implementation deferred to Task 4
-        raise NotImplementedError("Implemented in Task 4")
+        path, label = self.samples[idx]
+        img = Image.open(path).convert("RGB")
+        tensor = F.to_image(img)
+        tensor = F.to_dtype(tensor, dtype=torch.float32, scale=True)
+        if self.transform is not None:
+            tensor = self.transform(tensor)
+        return tensor, label
