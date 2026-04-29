@@ -36,3 +36,16 @@ def test_save_with_suffix(tmp_path: Path) -> None:
     out = save_with_suffix(src, img, "Flip")
     assert out.name == "image (1)_Flip.JPG"
     assert out.exists()
+
+
+def test_balance_directory_creates_target_count(tmp_dataset: Path, tmp_path: Path) -> None:
+    from leaffliction.augment import balance_directory
+
+    out_root = tmp_path / "augmented"
+    summary = balance_directory(tmp_dataset, out_root, target_count=5, seed=0)
+    # tmp_dataset has 2 classes × 3 images. target=5 → 5 each
+    for cls in ("ClassA", "ClassB"):
+        files = list((out_root / cls).iterdir())
+        assert len(files) == 5
+    assert summary["ClassA"] == 5
+    assert summary["ClassB"] == 5

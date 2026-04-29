@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+import shutil
 from pathlib import Path
 
 import albumentations as A  # noqa: N812
@@ -49,3 +50,46 @@ def save_with_suffix(original_path: Path, image: np.ndarray, suffix: str) -> Pat
 
 def load_image(path: Path) -> np.ndarray:
     return np.array(Image.open(path).convert("RGB"))
+
+
+def balance_directory(
+    src_root: Path,
+    dst_root: Path,
+    target_count: int | None = None,
+    seed: int = 42,
+) -> dict[str, int]:
+    """Copy originals + generate augmentations so every class reaches target_count.
+
+    If target_count is None, uses the largest class size.
+    Returns {class_name: final_count}.
+    """
+    from leaffliction.dataset import discover_classes  # avoid circular at import
+
+    src_root = Path(src_root)
+    dst_root = Path(dst_root)
+    rng = random.Random(seed)
+
+    classes = discover_classes(src_root)
+    target = target_count if target_count is not None else max(len(p) for p in classes.values())
+
+    summary: dict[str, int] = {}
+    for cls, paths in classes.items():
+        cls_dst = dst_root / cls
+        cls_dst.mkdir(parents=True, exist_ok=True)
+        # 1) copy originals (cap at target if class already exceeds it)
+        originals_to_copy = paths[:target]
+        for src in originals_to_copy:
+            shutil.copy2(src, cls_dst / src.name)
+        produced = len(originals_to_copy)
+        # 2) augment until target reached
+        bump = 0
+        while produced < target:
+            base = rng.choice(paths)
+            img = load_image(base)
+            op_name, aug = apply_random_op(img, rng)
+            out = cls_dst / f"{base.stem}_{op_name}_{bump}{base.suffix}"
+            Image.fromarray(aug).save(out)
+            produced += 1
+            bump += 1
+        summary[cls] = produced
+    return summary
