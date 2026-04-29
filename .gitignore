@@ -1,0 +1,22 @@
+# Datasets and models — never commit
+images/
+augmented_directory/
+artifacts/
+*.zip
+*.pt
+*.pth
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
