@@ -64,7 +64,7 @@ def _epoch(
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            loss_sum += float(loss) * x.size(0)
+            loss_sum += loss.detach().item() * x.size(0)
             correct += (logits.argmax(1) == y).sum().item()
             total += x.size(0)
     return loss_sum / max(total, 1), correct / max(total, 1)
