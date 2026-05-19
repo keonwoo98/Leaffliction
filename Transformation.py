@@ -12,7 +12,6 @@ from rich.progress import track
 
 from leaffliction.cli import console, die
 from leaffliction.transform import all_transforms, color_histogram, load_rgb
-from leaffliction.viz import grid
 
 app = typer.Typer(
     add_completion=False,
@@ -62,15 +61,23 @@ def main(
             die(f"Not a file: {image}")
         rgb = load_rgb(image)
         outs = all_transforms(rgb)
-        grid(list(outs.items()))
         hist = color_histogram(rgb)
-        plt.figure(figsize=(10, 5))
+
+        # One figure: top row = 6 transforms, bottom = full-width histogram.
+        fig = plt.figure(figsize=(16, 9))
+        for i, (name, img) in enumerate(outs.items()):
+            ax = plt.subplot2grid((2, 6), (0, i), fig=fig)
+            ax.imshow(img, cmap="gray" if img.ndim == 2 else None)
+            ax.set_title(name, fontsize=10)
+            ax.axis("off")
+        ax_hist = plt.subplot2grid((2, 6), (1, 0), colspan=6, fig=fig)
         for name, values in hist.items():
-            plt.plot(values, label=name)
-        plt.title("Color histogram")
-        plt.xlabel("Pixel intensity")
-        plt.ylabel("Proportion of pixels (%)")
-        plt.legend()
+            ax_hist.plot(values, label=name)
+        ax_hist.set_title("Color histogram")
+        ax_hist.set_xlabel("Pixel intensity")
+        ax_hist.set_ylabel("Proportion of pixels (%)")
+        ax_hist.legend(loc="upper right", fontsize=8)
+        fig.suptitle(f"Transformations: {image.name}", fontsize=11)
         plt.tight_layout()
         plt.show()
         return
