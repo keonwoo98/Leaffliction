@@ -244,14 +244,9 @@ def main(
         for p in out.iterdir():
             zf.write(p, arcname=p.name)
 
+    # augmented_directory.zip is produced by Augmentation.py (--balance). If it
+    # exists alongside trained_models.zip, include both in signature.txt.
     aug_zip = Path("augmented_directory.zip")
-    aug_dir = Path("augmented_directory")
-    if aug_dir.exists():
-        with zipfile.ZipFile(aug_zip, "w", zipfile.ZIP_DEFLATED) as zf:
-            for p in aug_dir.rglob("*"):
-                if p.is_file():
-                    zf.write(p, arcname=p.relative_to(aug_dir.parent))
-
     sig_inputs = [models_zip] + ([aug_zip] if aug_zip.exists() else [])
     write_signature(sig_inputs, Path("signature.txt"))
     console.print("[ok]Done. trained_models.zip + signature.txt generated.[/ok]")

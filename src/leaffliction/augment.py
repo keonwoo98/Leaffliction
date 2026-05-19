@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import shutil
+import zipfile
 from pathlib import Path
 
 import albumentations as A  # noqa: N812
@@ -49,15 +50,33 @@ def load_image(path: Path) -> np.ndarray:
     return np.array(Image.open(path).convert("RGB"))
 
 
+def zip_directory(directory: Path) -> Path:
+    """Create <directory>.zip next to the directory itself.
+
+    The resulting archive uses the directory's basename as the top-level entry
+    so unzipping produces the same folder structure.
+    """
+    directory = Path(directory)
+    zip_path = directory.with_suffix(".zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in directory.rglob("*"):
+            if p.is_file():
+                zf.write(p, arcname=p.relative_to(directory.parent))
+    return zip_path
+
+
 def balance_directory(
     src_root: Path,
     dst_root: Path,
     target_count: int | None = None,
     seed: int = 42,
+    make_zip: bool = True,
 ) -> dict[str, int]:
     """Copy originals + generate augmentations so every class reaches target_count.
 
     If target_count is None, uses the largest class size.
+    By default also creates <dst_root>.zip alongside the folder (PDF Chapter V
+    requires this archive for the defense signature check).
     Returns {class_name: final_count}.
     """
     from leaffliction.dataset import discover_classes  # avoid circular at import
@@ -89,4 +108,8 @@ def balance_directory(
             produced += 1
             bump += 1
         summary[cls] = produced
+
+    if make_zip:
+        zip_directory(dst_root)
+
     return summary
