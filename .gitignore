@@ -16,6 +16,7 @@ __pycache__/
 htmlcov/
 train.log
 .trained_models_unpacked/
+out/
 *.egg-info/
 build/
 dist/

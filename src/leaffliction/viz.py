@@ -21,10 +21,20 @@ def pie_and_bar(class_counts: dict[str, int], title: str, save: Path | None = No
     axes[0].pie(counts, labels=classes, autopct="%1.1f%%", colors=colors, startangle=90)
     axes[0].set_title(f"{title} class distribution")
 
-    axes[1].bar(classes, counts, color=colors)
+    bars = axes[1].bar(classes, counts, color=colors)
     axes[1].set_xticks(range(len(classes)))
     axes[1].set_xticklabels(classes, rotation=20, ha="right")
     axes[1].grid(axis="y", alpha=0.3)
+    # Annotate each bar with its exact count.
+    for bar, n in zip(bars, counts, strict=True):
+        axes[1].text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            str(n),
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
 
     plt.tight_layout()
     if save is not None:
