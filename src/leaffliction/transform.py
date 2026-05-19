@@ -25,17 +25,25 @@ def load_rgb(path: Path) -> np.ndarray:
 
 
 def _binary_mask(rgb: np.ndarray) -> np.ndarray:
-    """HSV-S threshold + fill small holes — used by several transforms."""
-    s = pcv.rgb2gray_hsv(rgb_img=rgb, channel="s")
-    binary = pcv.threshold.binary(gray_img=s, threshold=85, object_type="light")
+    """Leaf segmentation tuned for PlantVillage-style controlled images.
+
+    Uses the LAB a* channel: the grey PlantVillage background sits at
+    a*≈128 (neutral), green leaves push a* below 128, and brown lesions
+    push it above 128. Thresholding on |a* - 128| with Otsu's automatic
+    cutoff separates *any* leaf (green or diseased) from background in
+    one step — works far more reliably than the previous HSV-S
+    threshold, which missed leaves with low colour saturation.
+    """
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB)
+    a = lab[..., 1]
+    a_dev = np.abs(a.astype(np.int16) - 128).astype(np.uint8)
+    _, binary = cv2.threshold(a_dev, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return pcv.fill(bin_img=binary, size=200)
 
 
 def gaussian_blur(rgb: np.ndarray) -> np.ndarray:
-    """Show a Gaussian-blurred version of the binary leaf mask."""
-    s = pcv.rgb2gray_hsv(rgb_img=rgb, channel="s")
-    binary = pcv.threshold.binary(gray_img=s, threshold=85, object_type="light")
-    return pcv.gaussian_blur(img=binary, ksize=(5, 5))
+    """Gaussian-blurred binary leaf mask (uses the same segmentation)."""
+    return pcv.gaussian_blur(img=_binary_mask(rgb), ksize=(5, 5))
 
 
 def mask(rgb: np.ndarray) -> np.ndarray:
