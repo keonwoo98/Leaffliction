@@ -2,7 +2,7 @@
 
 > Computer vision — image classification by disease recognition on leaves (42 project).
 
-Trains and serves an 8-class leaf disease classifier (Apple/Grape × healthy + 3 diseases each) using a hand-designed CNN ("ScratchCNN") where every layer is the author's own design.
+Trains and serves an 8-class leaf disease classifier (Apple/Grape × healthy + 3 diseases each) using two parallel models: a hand-designed CNN ("ScratchCNN") for full author ownership, plus an EfficientNet-B0 transfer-learning model for production accuracy.
 
 ## Setup
 
@@ -31,27 +31,30 @@ The five entrypoints required by the project subject:
 
 # Part 2 — single image (saves 6 augmentations alongside) or batch balance
 ./Augmentation.py "images/Apple_healthy/image (1).JPG"
-./Augmentation.py images/
+./Augmentation.py images/ --balance --output augmented_directory/
 
 # Part 3 — plantCV transformations + color histogram
 ./Transformation.py "images/Apple_healthy/image (1).JPG"
 ./Transformation.py -src images/Apple_healthy/ -dst out/ -mask
 ./Transformation.py -h
 
-# Part 4 — train + predict
+# Part 4 — train (ScratchCNN by default) + predict
 ./train.py images/ --epochs 25
+./train.py images/ --epochs 25 --model both     # train both for comparison
 ./predict.py "images/Apple_healthy/image (1).JPG"
+./predict.py "image.JPG" --model transfer       # use the transfer model if trained
 ```
 
 Each script supports `--help` (and `-h` where the subject mentions it) listing all options.
 
-## Model
+## Models
 
-| Architecture | Approx. params | Target val_accuracy |
-|--------------|----------------|---------------------|
-| 4 × Conv-BN-ReLU + GAP + FC | ~1.2M | >= 90% |
+| Model | Architecture | Approx. params | Target val_accuracy |
+|-------|--------------|----------------|---------------------|
+| Scratch | 4 × Conv-BN-ReLU + GAP + FC | ~1.2M | 88-93% |
+| Transfer | EfficientNet-B0 (ImageNet → fine-tune) | ~4.0M | 95-98% |
 
-Trained from scratch on the raw `images/` directory with stratified 80/20 split, online augmentation (`RandomHorizontalFlip` + `RandomRotation`), and `WeightedRandomSampler` to balance classes. No external pretrained weights — every layer is the author's design (defense-friendly).
+**ScratchCNN is the default** for both training and prediction (every layer is the author's design — the natural defense pitch). TransferModel exists alongside as an opt-in comparison via `--model transfer` or `--model both` on `train.py`, and `--model transfer` on `predict.py`. The transfer model uses EfficientNet-B0, itself a CNN — useful for explaining how convolutional networks are deployed in production while keeping the from-scratch model as the headline result.
 
 ## Quality
 
@@ -73,7 +76,7 @@ make format      # auto-fix ruff issues
 │   ├── augment.py        # 6 Albumentations ops + balance_directory
 │   ├── transform.py      # 6 plantCV transforms + 9-channel histogram
 │   ├── viz.py            # matplotlib charts
-│   ├── models/           # ScratchCNN
+│   ├── models/           # ScratchCNN + TransferModel
 │   ├── trainer.py        # train loop with early stop + LR plateau
 │   ├── predictor.py      # zip-loading inference
 │   ├── signature.py      # SHA1 sign + verify
@@ -93,7 +96,7 @@ make format      # auto-fix ruff issues
 
 - [ ] `make lint` passes
 - [ ] `make test` passes
-- [ ] `train.py` completes; val_accuracy >= 90 percent
+- [ ] `train.py` completes; both models reach val_accuracy >= 90 percent
 - [ ] `signature.txt`, `trained_models.zip`, `augmented_directory.zip` exist on disk
 - [ ] `make verify` confirms hashes
 - [ ] `git status` shows zero `*.zip / *.pt / images/ / augmented_directory/` files

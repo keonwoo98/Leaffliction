@@ -12,11 +12,19 @@ import torch
 from PIL import Image
 from torchvision.transforms.v2 import functional as F  # noqa: N812
 
-from leaffliction.models import ScratchCNN
+from leaffliction.models import ScratchCNN, TransferModel
 from leaffliction.transform import mask as mask_transform
 
 ImageNetMean = [0.485, 0.456, 0.406]
 ImageNetStd = [0.229, 0.224, 0.225]
+
+
+def _build_model(name: str, num_classes: int) -> torch.nn.Module:
+    if name == "scratch":
+        return ScratchCNN(num_classes=num_classes)
+    if name == "transfer":
+        return TransferModel(num_classes=num_classes, pretrained=False)
+    raise ValueError(f"Unknown model name: {name}")
 
 
 def _preprocess(rgb: np.ndarray, size: int = 256) -> torch.Tensor:
@@ -27,8 +35,8 @@ def _preprocess(rgb: np.ndarray, size: int = 256) -> torch.Tensor:
     return t.unsqueeze(0)
 
 
-def predict(image_path: Path, zip_path: Path) -> dict:
-    """Return {'class', 'confidence', 'rgb', 'transformed'}."""
+def predict(image_path: Path, zip_path: Path, prefer: str = "scratch") -> dict:
+    """Return {'class', 'confidence', 'rgb', 'transformed', 'model_used'}."""
     image_path = Path(image_path)
     zip_path = Path(zip_path)
 
@@ -40,11 +48,18 @@ def predict(image_path: Path, zip_path: Path) -> dict:
     metadata = json.loads((extract_dir / "metadata.json").read_text())
     classes: list[str] = metadata["classes"]
 
-    weight_file = extract_dir / "model_scratch.pt"
+    weight_file = extract_dir / f"model_{prefer}.pt"
     if not weight_file.exists():
-        raise FileNotFoundError(f"model_scratch.pt not found inside {zip_path}")
+        for alt in ("scratch", "transfer"):
+            cand = extract_dir / f"model_{alt}.pt"
+            if cand.exists():
+                weight_file = cand
+                prefer = alt
+                break
+    if not weight_file.exists():
+        raise FileNotFoundError(f"No model_*.pt inside {zip_path}")
 
-    model = ScratchCNN(num_classes=len(classes))
+    model = _build_model(prefer, num_classes=len(classes))
     model.load_state_dict(torch.load(weight_file, map_location="cpu"))
     model.eval()
 
@@ -59,6 +74,7 @@ def predict(image_path: Path, zip_path: Path) -> dict:
         "confidence": float(probs[idx]),
         "rgb": rgb,
         "transformed": mask_transform(rgb),
+        "model_used": prefer,
     }
 
 

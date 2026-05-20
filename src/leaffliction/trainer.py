@@ -27,6 +27,7 @@ class TrainConfig:
     weight_decay: float = 1e-4
     patience: int = 5
     min_delta: float = 1e-3
+    unfreeze_after: int | None = None  # for transfer model: epoch at which to unfreeze
 
 
 @dataclass
@@ -92,6 +93,24 @@ def train(
     best_state: dict[str, Any] | None = None
 
     for epoch in range(1, config.epochs + 1):
+        if (
+            config.unfreeze_after is not None
+            and epoch == config.unfreeze_after + 1
+            and hasattr(model, "unfreeze")
+        ):
+            model.unfreeze()
+            optimizer = optim.Adam(
+                model.parameters(),
+                lr=config.lr * 0.1,
+                weight_decay=config.weight_decay,
+            )
+            # Re-bind scheduler to the new optimizer so plateau-driven LR drops
+            # actually affect post-unfreeze training (otherwise the scheduler
+            # keeps a stale reference to the frozen-stage optimizer).
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode="max", factor=0.5, patience=2
+            )
+
         train_loss, train_acc = _epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc = _epoch(model, val_loader, criterion, None, device)
 

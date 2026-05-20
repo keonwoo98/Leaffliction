@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Part 4 — train ScratchCNN; package artifacts + signature."""
+"""Part 4 — train ScratchCNN and TransferModel; package artifacts + signature."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from torchvision.transforms.v2 import (
 
 from leaffliction.cli import console, die
 from leaffliction.dataset import LeafDataset
-from leaffliction.models import ScratchCNN
+from leaffliction.models import ScratchCNN, TransferModel
 from leaffliction.predictor import ImageNetMean, ImageNetStd
 from leaffliction.seed import set_seed
 from leaffliction.signature import write_signature
@@ -105,20 +105,21 @@ def _build_loaders(directory: Path, split: float, batch: int, seed: int):
     return train_loader, val_loader, train_full.classes, train_full.class_to_idx
 
 
-def _train_model(
+def _train_one(
+    name: str,
     model: torch.nn.Module,
     train_loader: DataLoader,
     val_loader: DataLoader,
     cfg: TrainConfig,
 ) -> dict:
-    """Train the model, printing progress per epoch so the log file is readable."""
+    """Train one model, printing progress per epoch so the log file is readable."""
     start = time.time()
-    console.print(f"[info]>>> Starting scratch ({cfg.epochs} epochs max)...[/info]")
+    console.print(f"[info]>>> Starting {name} ({cfg.epochs} epochs max)...[/info]")
 
     def on_epoch_end(epoch: int, metrics: dict) -> None:
         elapsed = time.time() - start
         console.print(
-            f"  scratch epoch {epoch:3d}/{cfg.epochs} "
+            f"  {name} epoch {epoch:3d}/{cfg.epochs} "
             f"| train: loss={metrics['train_loss']:.4f} acc={metrics['train_acc']:.4f} "
             f"| val: loss={metrics['val_loss']:.4f} acc={metrics['val_acc']:.4f} "
             f"| t={elapsed:.0f}s"
@@ -127,7 +128,7 @@ def _train_model(
     result = train(model, train_loader, val_loader, cfg, on_epoch_end=on_epoch_end)
     total = time.time() - start
     console.print(
-        f"[ok]<<< scratch done in {total:.0f}s. "
+        f"[ok]<<< {name} done in {total:.0f}s. "
         f"Best val_acc={result.best_val_acc:.4f} @ epoch {result.best_epoch}[/ok]"
     )
     return {
@@ -139,6 +140,15 @@ def _train_model(
 
 
 _DIRECTORY = typer.Argument(..., exists=True)
+_MODEL = typer.Option(
+    "scratch",
+    "--model",
+    help=(
+        "Which model(s) to train: 'scratch' (default, hand-designed CNN), "
+        "'transfer' (EfficientNet-B0 pretrained — production comparison), "
+        "or 'both'."
+    ),
+)
 _EPOCHS = typer.Option(25, "--epochs")
 _BATCH = typer.Option(32, "--batch")
 _SEED = typer.Option(42, "--seed")
@@ -149,12 +159,16 @@ _OUT = typer.Option(Path("artifacts"), "--out")
 @app.command()
 def main(
     directory: Path = _DIRECTORY,
+    model: str = _MODEL,
     epochs: int = _EPOCHS,
     batch: int = _BATCH,
     seed: int = _SEED,
     split: float = _SPLIT,
     out: Path = _OUT,
 ) -> None:
+    if model not in ("both", "scratch", "transfer"):
+        die(f"Invalid --model: {model}. Choose from both/scratch/transfer.")
+
     set_seed(seed)
     console.print(f"[info]Loading dataset from {directory} ...[/info]")
     train_loader, val_loader, classes, class_to_idx = _build_loaders(directory, split, batch, seed)
@@ -166,19 +180,39 @@ def main(
         die("Validation set has fewer than 100 images — PDF requires >= 100.")
 
     out.mkdir(parents=True, exist_ok=True)
+    artifacts: dict[str, dict] = {}
 
-    console.print("[info]Training ScratchCNN ...[/info]")
-    artifact = _train_model(
-        ScratchCNN(num_classes=n_classes),
-        train_loader,
-        val_loader,
-        TrainConfig(epochs=epochs, lr=1e-3, patience=5),
+    if model in ("both", "scratch"):
+        console.print("[info]Training ScratchCNN ...[/info]")
+        artifacts["scratch"] = _train_one(
+            "scratch",
+            ScratchCNN(num_classes=n_classes),
+            train_loader,
+            val_loader,
+            TrainConfig(epochs=epochs, lr=1e-3, patience=5),
+        )
+        save_state(artifacts["scratch"]["state"], out / "model_scratch.pt")
+
+    if model in ("both", "transfer"):
+        console.print("[info]Training TransferModel ...[/info]")
+        artifacts["transfer"] = _train_one(
+            "transfer",
+            TransferModel(num_classes=n_classes, pretrained=True),
+            train_loader,
+            val_loader,
+            TrainConfig(epochs=epochs, lr=1e-3, patience=5, unfreeze_after=5),
+        )
+        save_state(artifacts["transfer"]["state"], out / "model_transfer.pt")
+
+    best_name = max(artifacts, key=lambda k: artifacts[k]["best_val_acc"])
+    learning_curves(artifacts[best_name]["history"], out / "learning_curves.png")
+
+    best_model = (
+        ScratchCNN(num_classes=n_classes)
+        if best_name == "scratch"
+        else TransferModel(num_classes=n_classes, pretrained=False)
     )
-    save_state(artifact["state"], out / "model_scratch.pt")
-    learning_curves(artifact["history"], out / "learning_curves.png")
-
-    best_model = ScratchCNN(num_classes=n_classes)
-    best_model.load_state_dict(artifact["state"])
+    best_model.load_state_dict(artifacts[best_name]["state"])
     best_model.eval()
     y_true: list[int] = []
     y_pred: list[int] = []
@@ -202,10 +236,12 @@ def main(
         "image_size": 256,
         "normalize_mean": ImageNetMean,
         "normalize_std": ImageNetStd,
-        "model": {
-            "name": "ScratchCNN",
-            "val_accuracy": round(artifact["best_val_acc"], 4),
-            "best_epoch": artifact["best_epoch"],
+        "models": {
+            name: {
+                "val_accuracy": round(art["best_val_acc"], 4),
+                "best_epoch": art["best_epoch"],
+            }
+            for name, art in artifacts.items()
         },
         "split": {"train": split, "val": round(1 - split, 4)},
     }
@@ -216,16 +252,17 @@ def main(
         for p in out.iterdir():
             zf.write(p, arcname=p.name)
 
-    # augmented_directory.zip is produced by Augmentation.py. If it exists
-    # alongside trained_models.zip, include both in signature.txt.
+    # augmented_directory.zip is produced by Augmentation.py (--balance). If it
+    # exists alongside trained_models.zip, include both in signature.txt.
     aug_zip = Path("augmented_directory.zip")
     sig_inputs = [models_zip] + ([aug_zip] if aug_zip.exists() else [])
     write_signature(sig_inputs, Path("signature.txt"))
     console.print("[ok]Done. trained_models.zip + signature.txt generated.[/ok]")
-    console.print(
-        f"  [info]scratch[/info]: best val_acc={artifact['best_val_acc']:.4f} "
-        f"@ epoch {artifact['best_epoch']}"
-    )
+    for name, art in artifacts.items():
+        console.print(
+            f"  [info]{name}[/info]: best val_acc={art['best_val_acc']:.4f} "
+            f"@ epoch {art['best_epoch']}"
+        )
 
 
 if __name__ == "__main__":
