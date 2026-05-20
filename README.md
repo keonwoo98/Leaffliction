@@ -2,7 +2,7 @@
 
 > Computer vision — image classification by disease recognition on leaves (42 project).
 
-Trains and serves an 8-class leaf disease classifier (Apple/Grape × healthy + 3 diseases each) using two parallel models: a hand-designed CNN ("ScratchCNN") for full author ownership, plus an EfficientNet-B0 transfer-learning model for production accuracy.
+Trains and serves an 8-class leaf disease classifier (Apple/Grape × healthy + 3 diseases each) using a hand-designed CNN ("ScratchCNN") where every layer is the author's own design.
 
 ## Setup
 
@@ -31,28 +31,27 @@ The five entrypoints required by the project subject:
 
 # Part 2 — single image (saves 6 augmentations alongside) or batch balance
 ./Augmentation.py "images/Apple_healthy/image (1).JPG"
-./Augmentation.py images/ --balance --output augmented_directory/
+./Augmentation.py images/
 
 # Part 3 — plantCV transformations + color histogram
 ./Transformation.py "images/Apple_healthy/image (1).JPG"
 ./Transformation.py -src images/Apple_healthy/ -dst out/ -mask
 ./Transformation.py -h
 
-# Part 4 — train (both models in one run) + predict
-./train.py augmented_directory/ --epochs 25
+# Part 4 — train + predict
+./train.py images/ --epochs 25
 ./predict.py "images/Apple_healthy/image (1).JPG"
 ```
 
 Each script supports `--help` (and `-h` where the subject mentions it) listing all options.
 
-## Models
+## Model
 
-| Model | Architecture | Approx. params | Target val_accuracy |
-|-------|--------------|----------------|---------------------|
-| Scratch | 4 × Conv-BN-ReLU + GAP + FC | ~1.2M | 88-93% |
-| Transfer | EfficientNet-B0 (ImageNet → fine-tune) | ~4.0M | 95-98% |
+| Architecture | Approx. params | Target val_accuracy |
+|--------------|----------------|---------------------|
+| 4 × Conv-BN-ReLU + GAP + FC | ~1.2M | >= 90% |
 
-Both train in a single `train.py` invocation; `predict.py` defaults to the better-performing model (configurable via `--model scratch|transfer`).
+Trained from scratch on the raw `images/` directory with stratified 80/20 split, online augmentation (`RandomHorizontalFlip` + `RandomRotation`), and `WeightedRandomSampler` to balance classes. No external pretrained weights — every layer is the author's design (defense-friendly).
 
 ## Quality
 
@@ -74,7 +73,7 @@ make format      # auto-fix ruff issues
 │   ├── augment.py        # 6 Albumentations ops + balance_directory
 │   ├── transform.py      # 6 plantCV transforms + 9-channel histogram
 │   ├── viz.py            # matplotlib charts
-│   ├── models/           # ScratchCNN + TransferModel
+│   ├── models/           # ScratchCNN
 │   ├── trainer.py        # train loop with early stop + LR plateau
 │   ├── predictor.py      # zip-loading inference
 │   ├── signature.py      # SHA1 sign + verify
@@ -94,7 +93,7 @@ make format      # auto-fix ruff issues
 
 - [ ] `make lint` passes
 - [ ] `make test` passes
-- [ ] `train.py` completes; both models reach val_accuracy >= 90 percent
+- [ ] `train.py` completes; val_accuracy >= 90 percent
 - [ ] `signature.txt`, `trained_models.zip`, `augmented_directory.zip` exist on disk
 - [ ] `make verify` confirms hashes
 - [ ] `git status` shows zero `*.zip / *.pt / images/ / augmented_directory/` files

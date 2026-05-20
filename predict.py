@@ -18,11 +18,6 @@ _ZIP = typer.Option(
     "--zip",
     help="Trained models archive (default: trained_models.zip).",
 )
-_MODEL = typer.Option(
-    "transfer",
-    "--model",
-    help="Preferred model: 'transfer' or 'scratch'.",
-)
 _SAVE = typer.Option(None, "--save", help="Save figure to PNG instead of showing.")
 
 
@@ -30,16 +25,12 @@ _SAVE = typer.Option(None, "--save", help="Save figure to PNG instead of showing
 def main(
     image: Path = _IMAGE,
     zip_path: Path = _ZIP,
-    model: str = _MODEL,
     save: Path | None = _SAVE,
 ) -> None:
     if not zip_path.exists():
         die(f"Zip not found: {zip_path}. Run train.py first.")
-    result = predict(image, zip_path, prefer=model)
-    console.print(
-        f"[ok]Class predicted: {result['class']} "
-        f"({result['confidence']:.1%}) [model={result['model_used']}][/ok]"
-    )
+    result = predict(image, zip_path)
+    console.print(f"[ok]Class predicted: {result['class']} ({result['confidence']:.1%})[/ok]")
     render(result, save=save)
 
 
