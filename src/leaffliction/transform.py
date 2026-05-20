@@ -27,23 +27,48 @@ def load_rgb(path: Path) -> np.ndarray:
 def _binary_mask(rgb: np.ndarray) -> np.ndarray:
     """Leaf segmentation tuned for PlantVillage-style controlled images.
 
-    Uses the LAB a* channel: the grey PlantVillage background sits at
-    a*≈128 (neutral), green leaves push a* below 128, and brown lesions
-    push it above 128. Thresholding on |a* - 128| with Otsu's automatic
-    cutoff separates *any* leaf (green or diseased) from background in
-    one step — works far more reliably than the previous HSV-S
-    threshold, which missed leaves with low colour saturation.
+    Pipeline:
+    1. LAB chroma magnitude — distance from neutral grey in the a*/b*
+       plane: sqrt((a-128)² + (b-128)²). Grey background ≈ 0; green
+       leaves and brown lesions both have positive chroma.
+    2. Otsu auto-threshold on the chroma image.
+    3. Morphological opening removes isolated background speckle.
+    4. Keep only the largest connected component — the leaf — which
+       drops any residual scattered blobs in the background.
+    5. Fill internal holes (textured surface, light specular spots,
+       and incidentally the natural holes in heavily diseased leaves);
+       we accept that trade-off because the "true" leaf footprint is
+       its outer boundary, not the pinholes inside it.
     """
+    from scipy.ndimage import binary_fill_holes
+
     lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB)
-    a = lab[..., 1]
-    a_dev = np.abs(a.astype(np.int16) - 128).astype(np.uint8)
-    _, binary = cv2.threshold(a_dev, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return pcv.fill(bin_img=binary, size=200)
+    a = lab[..., 1].astype(np.int16) - 128
+    b = lab[..., 2].astype(np.int16) - 128
+    chroma = np.sqrt(a * a + b * b).clip(0, 255).astype(np.uint8)
+    _, binary = cv2.threshold(chroma, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    kernel = np.ones((3, 3), np.uint8)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=1)
+
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
+    if num_labels > 1:
+        largest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+        binary = np.where(labels == largest, 255, 0).astype(np.uint8)
+
+    filled = binary_fill_holes(binary > 0).astype(np.uint8) * 255
+    return pcv.fill(bin_img=filled, size=200)
 
 
 def gaussian_blur(rgb: np.ndarray) -> np.ndarray:
-    """Gaussian-blurred binary leaf mask (uses the same segmentation)."""
-    return pcv.gaussian_blur(img=_binary_mask(rgb), ksize=(5, 5))
+    """Gaussian-blurred binary leaf mask (uses the same segmentation).
+
+    Uses cv2.GaussianBlur directly rather than pcv.gaussian_blur, which
+    in plantCV 4.x can interfere with matplotlib's current figure state
+    (it's designed for plantCV's debug-plot workflow). cv2 keeps the
+    output as a clean 0–255 uint8 array suitable for plt.imshow.
+    """
+    return cv2.GaussianBlur(_binary_mask(rgb), (5, 5), 0)
 
 
 def mask(rgb: np.ndarray) -> np.ndarray:
