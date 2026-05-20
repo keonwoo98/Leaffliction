@@ -67,7 +67,12 @@ def main(
         fig = plt.figure(figsize=(16, 9))
         for i, (name, img) in enumerate(outs.items()):
             ax = plt.subplot2grid((2, 6), (0, i), fig=fig)
-            ax.imshow(img, cmap="gray" if img.ndim == 2 else None)
+            # Lock 2-D (binary / grayscale) panels to a fixed 0-255 range so
+            # near-uniform masks don't get auto-normalised to all-black.
+            if img.ndim == 2:
+                ax.imshow(img, cmap="gray", vmin=0, vmax=255)
+            else:
+                ax.imshow(img)
             ax.set_title(name, fontsize=10)
             ax.axis("off")
         ax_hist = plt.subplot2grid((2, 6), (1, 0), colspan=6, fig=fig)
