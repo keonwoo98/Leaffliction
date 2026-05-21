@@ -50,8 +50,12 @@ The five entrypoints required by the project subject:
 # Part 4 — train (ScratchCNN by default) + predict
 ./train.py images/ --epochs 25
 ./train.py images/ --epochs 25 --model both     # train both for comparison
-./predict.py "images/Apple_healthy/image (1).JPG"
-./predict.py "image.JPG" --model transfer       # use the transfer model if trained
+
+# predict auto-dispatches: single file -> figure; many files / directory -> table
+./predict.py "images/Apple_healthy/image (1).JPG"        # single -> figure
+./predict.py "image.JPG" --model transfer                # transfer model
+./predict.py /test_images/Unit_test1/                    # directory -> table
+./predict.py /test_images/Unit_test1/ --save out/        # + dump <stem>_pred.png
 ```
 
 Each script supports `--help` (and `-h` where the subject mentions it) listing all options.

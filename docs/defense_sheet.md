@@ -316,6 +316,39 @@ transfer도 보여주기:
 - "이거 train accuracy 아니냐?" → 아니, `seed=42`로 split을 재현해서 train.py가 학습 중 본 적 없는 1,445장입니다. `train.py`의 출력값을 안 믿어도 됩니다.
 - "100장만 보자"고 하면 → 1,445장이 100장보다 많으니 자동 충족. 원하면 `--max 100`도 추가 가능하지만 1,445가 더 강한 증거.
 
+### 📌 참고 — val에서 실제로 틀린 사진 (defense day 사전 숙지용)
+
+평가자가 "어떤 사진이 틀렸어요?"라고 물어볼 때 즉답 가능하도록 미리 알아두기.
+
+**ScratchCNN — 3장 (1442/1445 = 99.79%)**:
+
+| 정답 | 예측(틀림) | 신뢰도 | 파일 |
+|------|-----------|--------|------|
+| Grape_spot | Apple_scab | 57.1% | `images/Grape_spot/image (128).JPG` |
+| Apple_healthy | Apple_Black_rot | 39.7% | `images/Apple_healthy/image (1040).JPG` |
+| Apple_healthy | Grape_healthy | 44.1% | `images/Apple_healthy/image (1326).JPG` |
+
+**TransferModel — 2장 (1443/1445 = 99.86%)**:
+
+| 정답 | 예측(틀림) | 신뢰도 | 파일 |
+|------|-----------|--------|------|
+| Apple_healthy | Apple_scab | 99.1% | `images/Apple_healthy/image (1040).JPG` |
+| Grape_Black_rot | Grape_Esca | 93.7% | `images/Grape_Black_rot/image (56).JPG` |
+
+**관찰 포인트** (Q&A에 활용):
+- `Apple_healthy/image (1040).JPG` 는 **두 모델 모두 틀림** → 데이터셋 자체의 어려운 케이스(또는 라벨링 노이즈) 일 가능성. 직접 띄워서 "이런 사진은 사람이 봐도 헷갈린다"고 보여줄 수 있음.
+- **ScratchCNN은 틀릴 때 39~57%로 낮은 confidence** → 모델이 망설였다는 뜻 (calibration이 정직).
+- **TransferModel은 틀릴 때도 93~99% confidence** → 자신만만하게 틀림. 신경망의 전형적인 overconfidence — ImageNet features가 너무 강해서 logit이 한쪽으로 쏠림.
+- → "두 모델 차이가 뭐냐"는 Q에 정확도뿐만 아니라 calibration도 다르다고 답 가능.
+
+```bash
+# defense 당일 직접 열어 보여줄 명령
+open "images/Apple_healthy/image (1040).JPG"  \
+     "images/Apple_healthy/image (1326).JPG"  \
+     "images/Grape_spot/image (128).JPG"      \
+     "images/Grape_Black_rot/image (56).JPG"
+```
+
 ---
 
 ## 7. Part 4 (2/4) — 모델 설명 (5점, 가장 중요)
@@ -443,35 +476,41 @@ optimizer.step()               # ⑤ weight 살짝 업데이트
 ### 💻 명령
 
 ```bash
-# 평가자가 test_images.zip을 풀어둔 위치에서
-for img in /tmp/test_images/Unit_test1/*.JPG; do
-  echo "=== $img ==="
-  ./predict.py "$img"
-done
-```
+# (권장) 폴더 통째로 한 번에 — 다중 모드, 콘솔 표 출력
+./predict.py /tmp/test_images/Unit_test1/
 
-또는 한 장씩:
+# 결과 PNG도 같이 저장하고 싶으면
+./predict.py /tmp/test_images/Unit_test1/ --save /tmp/out_unit1/
 
-```bash
+# 평가표 PDF 예시 그대로(단일 이미지)도 동일 명령으로 지원
 ./predict.py /tmp/test_images/Unit_test1/Apple_healthy1.JPG
 ```
 
 ### 🎤 대사
 
-> "Unit_test1은 Apple 4 클래스에서 뽑은 10장입니다. 평가자가 파일명을 안 보이게 바꾼다고 가정하고, `predict.py`는 사진만 보고 예측합니다."
+> "Unit_test1은 Apple 4 클래스에서 뽑은 10장입니다. `predict.py`에 폴더를 통째로 넘기면 자동으로 모든 `*.JPG`를 수집해서 한 번에 예측합니다. 단일 이미지로 호출하면 평가표 PDF 예시처럼 figure를 띄우고, 폴더나 여러 path를 넘기면 콘솔 표로 출력합니다."
 
-`predict.py` 출력은 2-패널 figure (원본 + mask transform) + 클래스명 + 신뢰도:
+다중 모드 출력 예시:
 
-> "각 예측은 클래스명과 신뢰도를 출력합니다. 신뢰도는 softmax 후 가장 큰 확률값."
+```
+Predicting 10 images with model=scratch...
+  OK   Apple_healthy      (99.8%)  ← Apple_healthy1.JPG
+  OK   Apple_Black_rot    (99.1%)  ← Apple_BlackRot2.JPG
+  ...
+Self-check: 10/10 = 100.00%
+```
+
+> "파일명이 `Apple_healthy1.JPG`처럼 클래스 이름으로 시작하면 자동 self-check가 동작합니다. 평가표가 명시한 대로 평가자가 파일명을 무작위로 바꿔도 그냥 `   ` 빈 칸으로만 표시되고 예측은 그대로 동작합니다 — 파일명은 self-check용 보조 정보일 뿐 예측 입력엔 안 쓰입니다."
 
 코드 위치 (`src/leaffliction/predictor.py`):
 
-> "predict는 (1) `trained_models.zip`을 임시 폴더에 풀고 (2) metadata.json에서 클래스 라벨 읽고 (3) `model_scratch.pt` 로드 (default), `--model transfer`로 transfer 모델도 선택 가능 (4) 이미지를 256×256 + ImageNet mean/std normalize (5) forward → argmax."
+> "내부적으로 (1) `trained_models.zip`을 한 번만 unzip하고 모델을 한 번 로드한 뒤 (2) 이미지마다 256×256 resize + ImageNet mean/std normalize + forward → softmax argmax. 다중 모드에서도 모델 로딩 비용은 한 번만 듭니다."
 
 ### ⚠️ 함정
 
 - 10장 모두 맞으면 5점.
 - 1~2장 틀려도 PlantVillage 분포 안에 있는 사진이면 confusion matrix와 일치하는 패턴인지 확인. 자연스러운 오답이면 점수 영향 적음.
+- 평가자가 파일명을 무작위로 바꿨다면 → self-check는 자동으로 skip. 콘솔 결과를 평가자가 보고 수동 채점.
 
 ---
 
@@ -486,15 +525,16 @@ done
 ### 💻 명령
 
 ```bash
-for img in /tmp/test_images/Unit_test2/*.JPG; do
-  echo "=== $img ==="
-  ./predict.py "$img"
-done
+# 폴더 통째로 — 다중 모드, 콘솔 표 + 자동 self-check
+./predict.py /tmp/test_images/Unit_test2/
+
+# PNG도 저장
+./predict.py /tmp/test_images/Unit_test2/ --save /tmp/out_unit2/
 ```
 
 ### 🎤 대사
 
-> "Unit_test2는 Grape 4 클래스에서 뽑은 10장입니다. 같은 방식으로 예측합니다."
+> "Unit_test2는 Grape 4 클래스에서 뽑은 10장입니다. 같은 폴더 다중 모드로 한 번에 돌립니다."
 
 > "평가표가 명시적으로 'Unit_test2에서 다 틀리면 누수 의심하라'고 적혀 있습니다. 우리는 §7에서 설명드린 split→augment 순서를 지켜서 누수를 차단했고, val accuracy 99.79%가 자연스러운 결과라는 걸 Unit_test2도 통과하는 걸로 보여드릴 수 있습니다."
 
